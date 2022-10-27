@@ -12,9 +12,17 @@ In the 1950s, the geochemist Charles David Keeling observed a seasonal pattern i
 In 1958 Keeling began continuous monitoring of atmospheric carbon dioxide concentrations from the Mauna Loa Observatory in Hawaii and soon observed a trend increase carbon dioxide levels in addition to the seasonal cycle. He was able to attribute this trend increase to growth in global rates of fossil fuel combustion. This trend has continued to the present, and is known as the "Keeling Curve."
 
 ```{r load packages, echo = FALSE, message = FALSE}
+#install.packages("tsibble")
+#install.packages("fpp3")
+#install.packages("tseries")
+
 library(tidyverse)
 library(tsibble)
 library(latex2exp)
+
+library(fpp3)
+library(tseries) 
+library(fable)
 
 theme_set(theme_minimal())
 knitr::opts_chunk$set(dpi=1000)
@@ -61,17 +69,233 @@ Conduct a comprehensive Exploratory Data Analysis on the `co2` series. This shou
 
 What you report in the deliverable should not be your own process of discovery, but rather a guided discussion that you have constructed so that your audience can come to an understanding as succinctly and successfully as possible. This means that figures should be thoughtfully constructed and what you learn from them should be discussed in text; to the extent that there is _any_ raw output from your analysis, you should intend for people to read and interpret it, and you should write your own interpretation as well. 
 
+```{r}
+co2 %>%
+  as_tsibble() -> co2_ts
+
+# Getting the overall CO2 values
+value <- co2_ts$value
+
+# Making four different plots for evaluation
+par(mfrow=c(2,2), mar = c(4.1, 4.1, 3, 2))
+plot(value, type = "l", col="orange2", main="CO2 time series",
+     xlab="Time", ylab="CO2 rate")
+pacf(value, col="gold3", main="PACF of CO2")
+acf(value, col="darkorange2", main="ACF of CO2")
+hist(value, main="CO2 Distribution",
+     ylab = "Frequency", xlab="CO2")
+```
+
+> ''   
+
 ## (3 points) Task 2a: Linear time trend model
 
 Fit a linear time trend model to the `co2` series, and examine the characteristics of the residuals. Compare this to a quadratic time trend model. Discuss whether a logarithmic transformation of the data would be appropriate. Fit a polynomial time trend model that incorporates seasonal dummy variables, and use this model to generate forecasts to the year 2020. 
+
+```{r linear time trend model}
+as_tsibble(co2) -> co2_ts
+
+co2_ts %>%
+  model(TSLM(value ~ trend())) -> fit_co2_trend
+report(fit_co2_trend)
+```
+
+> 'There is an average upward trend of 0.11 CO2 level.'   
+
+```{r linear time trend model residuals}
+fit_co2_trend %>%
+  gg_tsresiduals()
+```
+
+> 'Both in the scatter plot and the ACF, we see clearly that there is seasonality. There is also a curvy trend that we missed to be captured.'   
+
+```{r quadratic time trend model}
+as_tsibble(co2) -> co2_ts
+
+co2_ts %>%
+  model(TSLM(value ~ trend()+ I(trend()^2))) -> fit_co2_quad_trend
+report(fit_co2_quad_trend)
+```
+
+```{r quadratic time trend model residuals}
+fit_co2_quad_trend %>%
+  gg_tsresiduals()
+```
+
+> 'The trend is better now but there is still an up and down trend that can be modeled using polynomial. We do not see a change on the variance so the log transformation won't be necessary.'   
+
+```{r quadratic time trend with season model}
+as_tsibble(co2) -> co2_ts
+
+co2_ts %>%
+  model(TSLM(value ~ trend() + I(trend()^2) + I(trend()^3) + season())) -> fit_co2_full_trend
+report(fit_co2_quad_trend)
+```
+
+> ''   
+
+```{r quadratic time trend with season model residuals}
+fit_co2_full_trend %>%
+  gg_tsresiduals()
+```
+
+> ''   
+
+
+```{r}
+fc_co2_2020 <- forecast(fit_co2_full_trend, h=36)
+
+fc_co2_2020 %>%
+  autoplot(co2_ts) +
+  labs(
+    title = "Forecasts of CO2 level upto 2020 using regression",
+    y = "CO2 Level", x = "Time"
+  )
+```
+
+> ''   
 
 ## (3 points) Task 3a: ARIMA times series model 
 
 Following all appropriate steps, choose an ARIMA model to fit to the series. Discuss the characteristics of your model and how you selected between alternative ARIMA specifications. Use your model (or models) to generate forecasts to the year 2022. 
 
+```{r}
+adf.test(co2_ts$value, alternative = "stationary", k = 12)
+```
+
+> ''   
+
+```{r plot first diff CO2 level}
+# Getting the differenced values
+diff_level <- diff(co2_ts$value, lag=1)
+# Taking 3 years values to show zoom-in seasonal effect
+diff_level_short <- diff_level[0:36]
+
+# Making six different plots for evaluation
+par(mfrow=c(3,2), mar = c(4.1, 4.1, 3, 2))
+plot(diff_level, type = "l", col="orange2", main="Time series of all data")
+plot(diff_level_short, type = "l", col="orange2",
+     main="Time series of 3-years data")
+pacf(diff_level, col="gold3", main="PACF for all data")
+acf(diff_level_short, col="darkorange2", main="ACF for 3-years data")
+acf(diff_level, col="darkorange2", main="ACF for all data")
+hist(diff_level, main="Value Distribution")
+```
+> ''   
+
+```{r}
+adf.test(diff(co2_ts$value),
+         alternative = "stationary", k = 12)
+```
+
+> ''   
+
+```{r plot second diff CO2 level}
+# Getting the differenced CO2 levels; first and seasonal differecing
+diff_level <- diff(diff(co2_ts$value, lag=1), lag=12)
+
+# Making four different plots for evaluation
+par(mfrow=c(3,2), mar = c(4.1, 4.1, 3, 2))
+plot(diff_level, type = "l", col="orange2", main="Time series of all data")
+pacf(diff_level, col="gold3", main="PACF for all data")
+acf(diff_level, col="darkorange2", main="ACF for all data")
+hist(diff_level, main="Value Distribution")
+```
+
+> ''   
+
+```{r}
+adf.test(diff(diff(co2_ts$value), lag=12),
+         alternative = "stationary", k = 3)
+```
+
+> ''    
+
+```{r}
+model.bic <- co2_ts %>%
+  model(ARIMA(value ~ 0 + pdq(0:10, 1, 0:10) + PDQ(0:10, 1, 0:10),
+                       ic="bic", stepwise=F, greedy=F))
+
+model.bic %>%
+  report()
+```
+
+```{r}
+model.bic %>%
+  gg_tsresiduals()
+```
+
+> ''   
+
+```{r}
+fc_co2_2022 <- forecast(model.bic, h=60)
+
+fc_co2_2022 %>%
+  autoplot(co2_ts) +
+  labs(
+    title = "Forecasts of CO2 level upto 2022 using ARIMA",
+    y = "CO2 Level", x = "Time"
+  )
+```
+
+> ''   
+
 ## (3 points) Task 4a: Forecast atmospheric CO2 growth 
 
 Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](https://research.noaa.gov/article/ArtMID/587/ArticleID/2764/Coronavirus-response-barely-slows-rising-carbon-dioxide) and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2100. How confident are you that these will be accurate predictions?
+
+```{r prediction}
+fc_100_years <- forecast(model.bic, h=1236) %>%
+  hilo() %>%
+  unpack_hilo(c(`80%`, `95%`))
+
+fc_100_years %>%
+  filter(.mean >= 420 & .mean < 421) -> fc_420
+
+fc_100_years %>%
+  filter(.mean >= 500 & .mean < 501) -> fc_500
+
+# 420 PPM levels for the first and last time
+fc_420_first <- head(fc_420, n =1)
+fc_420_last  <- tail(fc_420, n =1)
+
+fc_420_first_time  <- fc_420_first$index
+fc_420_first_lower <- round(fc_420_first$`95%_lower`, 2)
+fc_420_first_upper <- round(fc_420_first$`95%_upper`, 2)
+fc_420_first_mean  <- round(fc_420_first$.mean, 2)
+
+fc_420_last_time  <- fc_420_last$index
+fc_420_last_lower <- round(fc_420_last$`95%_lower`, 2)
+fc_420_last_upper <- round(fc_420_last$`95%_upper`, 2)
+fc_420_last_mean  <- round(fc_420_last$.mean, 2)
+
+# 500 PPM levels for the first and last time
+fc_500_first <- head(fc_500, n =1)
+fc_500_last  <- tail(fc_500, n =1)
+
+fc_500_first_time  <- fc_500_first$index
+fc_500_first_lower <- round(fc_500_first$`95%_lower`, 2)
+fc_500_first_upper <- round(fc_500_first$`95%_upper`, 2)
+fc_500_first_mean  <- round(fc_500_first$.mean, 2)
+
+fc_500_last_time  <- fc_500_last$index
+fc_500_last_lower <- round(fc_500_last$`95%_lower`, 2)
+fc_500_last_upper <- round(fc_500_last$`95%_upper`, 2)
+fc_500_last_mean  <- round(fc_500_last$.mean, 2)
+
+# Atmospheric CO2 levels in the year 2100
+fc_2100  <- tail(fc_100_years, n =1)
+
+fc_2100_lower <- round(fc_2100$`95%_lower`, 2)
+fc_2100_upper <- round(fc_2100$`95%_upper`, 2)
+fc_2100_mean  <- round(fc_2100$.mean, 2)
+```
+
+> 'CO2 is expected to be at 420 ppm level for the first time on `r fc_420_first_time` with expected value of `r fc_420_first_mean` with `r fc_420_first_lower` - `r fc_420_first_upper` 95% confidence interval.'   
+> 'CO2 is expected to be at 420 ppm level for the last time on `r fc_420_last_time` with expected value of `r fc_420_last_mean` with `r fc_420_last_lower` - `r fc_420_last_upper` 95% confidence interval.'   
+> 'CO2 is expected to be at 500 ppm level for the first time on `r fc_500_first_time` with expected value of `r fc_500_first_mean` with `r fc_500_first_lower` - `r fc_500_first_upper` 95% confidence interval.'   
+> 'CO2 is expected to be at 500 ppm level for the last time on `r fc_500_last_time` with expected value of `r fc_500_last_mean` with `r fc_500_last_lower` - `r fc_500_last_upper` 95% confidence interval.'   
+> 'By the end of 2100 year, the CO2 is expected to be at `r fc_2100_mean` ppm level with `r fc_2100_lower` - `r fc_2100_upper` 95% confidence interval.'   
 
 # Report from the Point of View of the Present 
 
