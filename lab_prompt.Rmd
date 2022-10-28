@@ -147,7 +147,7 @@ fit_co2_full_trend %>%
 
 
 ```{r}
-fc_co2_2020 <- forecast(fit_co2_full_trend, h=36)
+fc_co2_2020 <- forecast(fit_co2_full_trend, h=276)
 
 fc_co2_2020 %>%
   autoplot(co2_ts) +
@@ -318,17 +318,64 @@ Create a data pipeline that starts by reading from the appropriate URL, and ends
 Conduct the same EDA on this data. Describe how the Keeling Curve evolved from 1997 to the present, noting where the series seems to be following similar trends to the series that you "evaluated in 1997" and where the series seems to be following different trends. This EDA can use the same, or very similar tools and views as you provided in your 1997 report.
 
 ```{r}
-cO2.present <- read.csv(
-  url("https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_weekly_mlo.csv"),
-  skip = 47)
+read.csv(
+  url("https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_mm_mlo.csv"),
+  skip = 52) %>%
+  mutate(time_index = make_datetime(year, month)) %>%
+  mutate(time_index = yearmonth(time_index)) %>%
+  as_tsibble(index = time_index) -> co2_present
 
-head(cO2.present)
+head(co2_present)
+```
+
+```{r}
+# Getting the overall CO2 values
+value <- co2_present$average
+
+# Making four different plots for evaluation
+par(mfrow=c(2,2), mar = c(4.1, 4.1, 3, 2))
+plot(value, type = "l", col="orange2", main="CO2 time series",
+     xlab="Time", ylab="CO2 rate")
+pacf(value, col="gold3", main="PACF of CO2")
+acf(value, col="darkorange2", main="ACF of CO2")
+hist(value, main="CO2 Distribution",
+     ylab = "Frequency", xlab="CO2")
+```
+
+```{r}
+# Getting the CO2 values since 1997
+value <- co2_present %>% filter(year > 1997, year < 2021)
+value <- value$average
+
+# Making four different plots for evaluation
+par(mfrow=c(2,2), mar = c(4.1, 4.1, 3, 2))
+plot(value, type = "l", col="orange2", main="CO2 time series",
+     xlab="Time", ylab="CO2 rate")
+pacf(value, col="gold3", main="PACF of CO2")
+acf(value, col="darkorange2", main="ACF of CO2")
+hist(value, main="CO2 Distribution",
+     ylab = "Frequency", xlab="CO2")
 ```
 
 
 ## (1 point) Task 2b: Compare linear model forecasts against realized CO2
 
 Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from a linear time model in 1997 (i.e. "Task 2a"). (You do not need to run any formal tests for this task.) 
+
+```{r, warning=FALSE}
+forecast <- append(rep(NA, length=nrow(co2_present)-nrow(fc_co2_2020)),
+                   fc_co2_2020$.mean)
+data.frame(time_index = co2_present$time_index, Actuals = co2_present$average, 
+           Forecast = forecast) %>%
+  pivot_longer(cols=c('Actuals', 'Forecast')) -> forecast_vs_actuals
+
+forecast_vs_actuals %>%
+  ggplot(aes(x = time_index, y = value, color = name)) +
+  geom_line() + 
+  labs(y = 'CO2 Level', x = '', title = 'Linear Model Forecast vs Realized CO2') 
+
+```
+
 
 ## (1 point) Task 3b: Compare ARIMA models forecasts against realized CO2  
 
