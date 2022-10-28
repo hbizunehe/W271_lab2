@@ -323,6 +323,7 @@ read.csv(
   skip = 52) %>%
   mutate(time_index = make_datetime(year, month)) %>%
   mutate(time_index = yearmonth(time_index)) %>%
+  filter(year < 2021) %>%
   as_tsibble(index = time_index) -> co2_present
 
 head(co2_present)
@@ -344,7 +345,7 @@ hist(value, main="CO2 Distribution",
 
 ```{r}
 # Getting the CO2 values since 1997
-value <- co2_present %>% filter(year > 1997, year < 2021)
+value <- co2_present %>% filter(year > 1997)
 value <- value$average
 
 # Making four different plots for evaluation
