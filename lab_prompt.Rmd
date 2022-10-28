@@ -232,7 +232,7 @@ model.bic %>%
 > ''   
 
 ```{r}
-fc_co2_2022 <- forecast(model.bic, h=60)
+fc_co2_2022 <- forecast(model.bic, h=276)
 
 fc_co2_2022 %>%
   autoplot(co2_ts) +
@@ -367,9 +367,9 @@ forecast <- append(rep(NA, length=nrow(co2_present)-nrow(fc_co2_2020)),
                    fc_co2_2020$.mean)
 data.frame(time_index = co2_present$time_index, Actuals = co2_present$average, 
            Forecast = forecast) %>%
-  pivot_longer(cols=c('Actuals', 'Forecast')) -> forecast_vs_actuals
+  pivot_longer(cols=c('Actuals', 'Forecast')) -> lm_vs_actuals
 
-forecast_vs_actuals %>%
+lm_vs_actuals %>%
   ggplot(aes(x = time_index, y = value, color = name)) +
   geom_line() + 
   labs(y = 'CO2 Level', x = '', title = 'Linear Model Forecast vs Realized CO2') 
@@ -380,6 +380,21 @@ forecast_vs_actuals %>%
 ## (1 point) Task 3b: Compare ARIMA models forecasts against realized CO2  
 
 Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from the ARIMA model that you fitted in 1997 (i.e. "Task 3a"). Describe how the Keeling Curve evolved from 1997 to the present. 
+
+```{r, warning=FALSE}
+forecast <- append(rep(NA, length=nrow(co2_present)-nrow(fc_co2_2022)),
+                   fc_co2_2022$.mean)
+data.frame(time_index = co2_present$time_index, Actuals = co2_present$average, 
+           Forecast = forecast) %>%
+  pivot_longer(cols=c('Actuals', 'Forecast')) -> arima_vs_actuals
+
+arima_vs_actuals %>%
+  ggplot(aes(x = time_index, y = value, color = name)) +
+  geom_line() + 
+  labs(y = 'CO2 Level', x = '', title = 'ARIMA Forecast vs Realized CO2') 
+```
+
+
 
 ## (3 points) Task 4b: Evaluate the performance of 1997 linear and ARIMA models 
 
