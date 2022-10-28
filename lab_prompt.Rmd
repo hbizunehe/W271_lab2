@@ -12,14 +12,13 @@ In the 1950s, the geochemist Charles David Keeling observed a seasonal pattern i
 In 1958 Keeling began continuous monitoring of atmospheric carbon dioxide concentrations from the Mauna Loa Observatory in Hawaii and soon observed a trend increase carbon dioxide levels in addition to the seasonal cycle. He was able to attribute this trend increase to growth in global rates of fossil fuel combustion. This trend has continued to the present, and is known as the "Keeling Curve."
 
 ```{r load packages, echo = FALSE, message = FALSE}
-#install.packages("tsibble")
-#install.packages("fpp3")
-#install.packages("tseries")
+list.of.packages <- c("tidyverse", "tsibble", "latex2exp", "fpp3", "tseries", "fable")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
 
 library(tidyverse)
 library(tsibble)
 library(latex2exp)
-
 library(fpp3)
 library(tseries) 
 library(fable)
