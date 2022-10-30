@@ -447,12 +447,10 @@ pred_date_upper <- round(max_date_pred_values$`95%_upper`, 2)
 
 # Difference between predicted and actual on max date
 pred_act_diff <- max_actual_value - pred_date_average
-
 ```
 
 We originally predicted that CO2 would cross the 420 ppm threshold for the first time on `r fc_420_first_time` with an expected value of `r fc_420_first_mean` with a 95% confidence interval between `r fc_420_first_lower` - `r fc_420_first_upper`. The maximum average monthly value to date is `r max_actual_value` on `r max_actual_date`. In our predictions, the nearest date with a value at or over `r max_actual_value` is `r fc_417_first_time`. Therefore, our predicted average CO2 values were approximately 10-years behind the actuals. When comparing our predicted values in `r max_actual_date` to the actual data, we observe an average predicted value of `r pred_date_average` with a 95% confidence interval between `r pred_date_lower` - `r pred_date_upper`. Although our predicted average value was lower than the actual by value by `r pred_act_diff` ppm, the actual value of `r max_actual_value` is between our 95% confidence interval `r pred_date_lower` - `r pred_date_upper`.
 
-After reflecting on your performance on this threshold-prediction task, continue to use the weekly data to generate a month-average series from 1997 to the present, and compare the overall forecasting performance of your models from Parts 2a and 3b over the entire period. (You should conduct formal tests for this task.) 
 
 ```{r linear time trend model to present}
 # Build model
@@ -675,45 +673,29 @@ Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) 
 -->
 \hrulefill
 
+Creating the seasonally-adjusted data.
+
 ```{r, seasonally adjust data, echo=FALSE}
 # Seasonally adjusted data
-co2_present_season <- co2_present %>%
-  model(stl = STL(average))
+co2_sa <- co2_present %>%
+  model(stl = STL(average)) %>%
+  components() %>%
+  as_tsibble()
 ```
 
-```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-# Plot & check
-s_plot <- components(co2_present_season) %>%
-  as_tsibble() %>%
-  autoplot(average, colour="gray") +
-  geom_line(aes(y=trend), colour = "#D55E00") +
-  labs(title = "CO2 Emissions with Seasonal Trend",
-       x = "Date",
-       y = TeX(r'($CO_2$ parts per million)')
-  )
-
-s_plot
-```
+Splitting both the SA and NSA time series into training and test sets.
 
 ```{r, test and train for 2 datasets, message=FALSE}
-# Create data frame with season values 
-df_season <- as_tsibble(data.frame(components(co2_present_season)))
-
 # Test size
 test.size <- 24 # Months
-test.df <- co2_present %>%
-  filter(year > 2018) %>%
-  mutate(.mean = average) # used later for ggplot
+test.df <- tail(co2_present, test.size) %>%
+  mutate(.mean = average) # Used later for ggplot
 
 # Train for non-seasonal (ns)
-train_ns <- co2_present %>%
-  slice(1:(n() - test.size))
+train_ns <- head(co2_present, nrow(co2_present) -  test.size)
            
 # Train for seasonal (s)
-train_s <-  df_season %>%
-  slice(1:(n() - test.size))
-
-head(train_s)
+train_s <- head(co2_sa, nrow(co2_sa) -  test.size)
 ```
 
 ```{r}
@@ -784,7 +766,6 @@ ns_diff_data <- train_ns %>%
 adf.test(ns_diff_data$second_diff, alternative = "stationary")
 ```
 
-
 ```{r, unit root test on non seasonal data second time}
 train_ns %>%
   mutate(second_diff = difference(difference(average, 12)), 1) %>%
@@ -820,14 +801,14 @@ fc_24_ns <- forecast(model.ns, h = 24)
 far_plot <- fc_24_ns %>%
   autoplot(train_ns) +
   labs(
-    title = "Forecasts of CO2 Level Up To 2022 Asing ARIMA",
-    y = "CO2 Level", x = "Time"
+    title = "ARIMA Forecast Using Non-Seasonally-Adjusted Present Data",
+    y = "CO2 Level", x = ""
   )
 
 near_plot <- ggplot(NULL, aes(x = time_index, y = .mean)) + 
   geom_line(data = fc_24_ns, col = "blue") +
   geom_line(data = test.df, col = "black") +
-  labs(title = "Arima Model Vs. Actuals",
+  labs(title = "Arima Forecast Vs. Actuals",
        subtitle = "Blue = Predicted", 
        x = "Time", 
        y = "CO2 Emissions")
@@ -942,8 +923,8 @@ fc_24_s <- forecast(model.s, h = 24)
 far_plot_2 <- fc_24_s %>%
   autoplot(train_s) +
   labs(
-    title = "Forecasts of CO2 level upto 2022 using ARIMA",
-    y = "CO2 Level", x = "Time"
+    title = "ARIMA Forecast Using Seasonally-Adjusted Present Data",
+    y = "CO2 Level", x = ""
   )
 
 near_plot2 <- ggplot(NULL, aes(x = time_index, y = .mean)) + 
@@ -958,7 +939,7 @@ grid.arrange(far_plot_2, near_plot2, ncol=1)
 
 ```
 
-The ARIMA hyper parameters that were selected include the following: ARIMA(1,2,1)(4,0,0)[12]. Using these values, the residual plots appear to meet the conditin of constant variance and a mean near zero. The test results also past the ljung_box statistical test. The ACF had some extreme values at the 2nd and 24th time lag, which seems a bit strange. The forecast estimates appear strange when juxtaposed next to the monthly data inclusive of the seasonal trends but that is because the underlying seasonality has been removed. 
+The ARIMA hyper parameters that were selected include the following: ARIMA(1,2,1)(4,0,0)[12]. Using these values, the residual plots appear to meet the condition of constant variance and a mean near zero. The test results also past the ljung_box statistical test. The ACF had some extreme values at the 2nd and 24th time lag, which seems a bit strange. The forecast estimates appear strange when juxtaposed next to the monthly data inclusive of the seasonal trends but that is because the underlying seasonality has been removed. 
 
 
 
