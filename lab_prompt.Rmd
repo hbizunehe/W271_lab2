@@ -814,7 +814,6 @@ near_plot <- ggplot(NULL, aes(x = time_index, y = .mean)) +
        y = "CO2 Emissions")
 
 grid.arrange(far_plot, near_plot, ncol=1)
-
 ```
 
 The residual plots for the ARIMA model appear to have constant variance and a mean near zero. The residuals pass the ljung_box test and all residual values are within the threshold values for ACF. The histogram also appears to be normally distributed. The forecast plots seem to track nicely with the actuals for the 24 month period.  
