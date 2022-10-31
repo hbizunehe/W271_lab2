@@ -209,36 +209,19 @@ Following all appropriate steps, choose an ARIMA model to fit to the series. Dis
 -->
 \hrulefill
 
-```{r}
-tseries::adf.test(co2_ts$value, alternative = "stationary", k = 12)
-```
-
-> ''   
-
 ```{r plot first diff CO2 level, echo=FALSE, fig.align='center', fig.height=6, fig.width=10}
 # Getting the differenced values
 diff_level <- diff(co2_ts$value, lag=1)
-# Taking 3 years values to show zoom-in seasonal effect
-diff_level_short <- diff_level[0:36]
 
 # Making six different plots for evaluation
 par(mfrow=c(3,2), mar = c(4.1, 4.1, 3, 2))
 plot(diff_level, type = "l", col="orange2", main="Time series of all data")
-plot(diff_level_short, type = "l", col="orange2",
-     main="Time series of 3-years data")
 pacf(diff_level, col="gold3", main="PACF for all data")
-acf(diff_level_short, col="darkorange2", main="ACF for 3-years data")
 acf(diff_level, col="darkorange2", main="ACF for all data")
 hist(diff_level, main="Value Distribution")
 ```
-> ''   
 
-```{r}
-tseries::adf.test(diff(co2_ts$value),
-         alternative = "stationary", k = 12)
-```
-
-> ''   
+> 'In Task 1a, we determined that the time series is not stationary. To remove the trend part of the time series, we performed the first differencing, and the new time series shows us that the trend is removed, but the seasonality is still there. The ACF shows oscillate correlations every 12 months, showing seasonality. So we need to perform a seasonal differencing to make the time series stationary.'   
 
 ```{r plot second diff CO2 level, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
 # Getting the differenced CO2 levels; first and seasonal differecing
@@ -252,27 +235,22 @@ acf(diff_level, col="darkorange2", main="ACF for all data")
 hist(diff_level, main="Value Distribution")
 ```
 
-> ''   
-
-```{r}
+```{r adf test after first differencing and lag-12 differencing}
 tseries::adf.test(diff(diff(co2_ts$value), lag=12),
          alternative = "stationary", k = 3)
 ```
 
-> ''    
+> 'The Dickey-Fuller test rejected the null hypothesis, which is that the time series is not stationary. The time series plot also visually looks stationary now. Significant correlations at different lags on both ACF and PACF might suggest that the process is ARMA. The distribution is normal, which will help to construct an asymptotic confidence interval. Next, we will search for a model that minimizes AICc after applying first and seasonal differencing.'  
 
 ```{r}
 model.aicc <- co2_ts %>%
   model(ARIMA(value ~ 0 + pdq(0:10, 1, 0:10) + PDQ(0:10, 1, 0:10),
                        ic="aicc", stepwise=F, greedy=F))
-
-model.aicc %>%
-  report()
+model.aicc %>% report()
 ```
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-model.aicc %>%
-  gg_tsresiduals()
+model.aicc %>% gg_tsresiduals()
 ```
 
 ```{r}
@@ -285,28 +263,20 @@ Box.test(resid.ts, lag = 1, type = "Ljung-Box")
 Box.test(resid.ts, lag = 10, type = "Ljung-Box")
 ```
 
-
-```{r}
-
-
-
-
-```
-
-> ''   
+> 'After performing first and seasonal differencing, we searched for the number of AR and MA terms for both seasonal and non-seasonal parts of the ARIMA model that minimizes AICc. We found an ARIMA model with three non-seasonal MA terms, one seasonal AR term, and two seasonal MA terms that can better fit the data. We also examined the residuals, which show no systematic relationships and it has only one minor significant correlation. The Box-Ljung test also shows that the null hypothesis, which is that data are independently distributed, is not rejected. So we can say that the residuals are white noise.'   
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-fc_co2_2022 <- forecast(model.bic, h=276)
+fc_co2_2022 <- fabletools::forecast(model.bic, h=60)
 
 fc_co2_2022 %>%
   autoplot(co2_ts) +
   labs(
-    title = "Forecasts of CO2 level Up To 2022 using ARIMA",
+    title = "Forecasts of CO2 level Up To 2022 using ARIMA model",
     y = "CO2 Level", x = "Time"
   )
 ```
 
-> ''   
+> 'The ARIMA does a reasonable job of predicting the trend and seasonality. Comparing it with the actual observed values will be helpful in evaluating if the model is useful. Compared to the linear regression forecast, the ARIMA model has a wider confidence interval.'   
 
 ## (3 points) Task 4a: Forecast atmospheric CO2 growth 
 <!--
@@ -315,7 +285,7 @@ Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](htt
 \hrulefill
 
 ```{r prediction}
-fc_100_years <- forecast(model.bic, h=1236) %>%
+fc_100_years <- fabletools::forecast(model.bic, h=1236) %>%
   hilo() %>%
   unpack_hilo(c(`80%`, `95%`))
 
@@ -361,10 +331,10 @@ fc_2100_upper <- round(fc_2100$`95%_upper`, 2)
 fc_2100_mean  <- round(fc_2100$.mean, 2)
 ```
 
-> 'CO2 is expected to be at 420 ppm level for the first time on `r fc_420_first_time` with expected value of `r fc_420_first_mean` with `r fc_420_first_lower` - `r fc_420_first_upper` 95% confidence interval.'   
-> 'CO2 is expected to be at 420 ppm level for the last time on `r fc_420_last_time` with expected value of `r fc_420_last_mean` with `r fc_420_last_lower` - `r fc_420_last_upper` 95% confidence interval.'   
-> 'CO2 is expected to be at 500 ppm level for the first time on `r fc_500_first_time` with expected value of `r fc_500_first_mean` with `r fc_500_first_lower` - `r fc_500_first_upper` 95% confidence interval.'   
-> 'CO2 is expected to be at 500 ppm level for the last time on `r fc_500_last_time` with expected value of `r fc_500_last_mean` with `r fc_500_last_lower` - `r fc_500_last_upper` 95% confidence interval.'   
+> 'CO2 is expected to be at 420 ppm level for the first time on `r fc_420_first_time` with expected value of `r fc_420_first_mean` and `r fc_420_first_lower` - `r fc_420_first_upper` 95% confidence interval.'   
+> 'CO2 is expected to be at 420 ppm level for the last time on `r fc_420_last_time` with expected value of `r fc_420_last_mean` and `r fc_420_last_lower` - `r fc_420_last_upper` 95% confidence interval.'   
+> 'CO2 is expected to be at 500 ppm level for the first time on `r fc_500_first_time` with expected value of `r fc_500_first_mean` and `r fc_500_first_lower` - `r fc_500_first_upper` 95% confidence interval.'   
+> 'CO2 is expected to be at 500 ppm level for the last time on `r fc_500_last_time` with expected value of `r fc_500_last_mean` and `r fc_500_last_lower` - `r fc_500_last_upper` 95% confidence interval.'   
 > 'By the end of 2100 year, the CO2 is expected to be at `r fc_2100_mean` ppm level with `r fc_2100_lower` - `r fc_2100_upper` 95% confidence interval.'   
 
 # Report from the Point of View of the Present 
