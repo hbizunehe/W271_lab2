@@ -40,13 +40,12 @@ knitr::opts_chunk$set(dpi=1000)
 
 \newpage
 
+<!---
 # The Keeling Curve
 
-<!---
 In the 1950s, the geochemist Charles David Keeling observed a seasonal pattern in the amount of carbon dioxide present in air samples collected over the course of several years. He was able to attribute this pattern to the variation in global rates of photosynthesis throughout the year, caused by the difference in land area and vegetation cover between the Earth's northern and southern hemispheres. 
 
 In 1958 Keeling began continuous monitoring of atmospheric carbon dioxide concentrations from the Mauna Loa Observatory in Hawaii and soon observed a trend increase carbon dioxide levels in addition to the seasonal cycle. He was able to attribute this trend increase to growth in global rates of fossil fuel combustion. This trend has continued to the present, and is known as the "Keeling Curve."
--->
 
 ```{r plot the keeling curve, echo = FALSE, fig.align='center', fig.height=4, fig.width=10}
 tsibble::as_tsibble(co2) %>%
@@ -60,9 +59,8 @@ tsibble::as_tsibble(co2) %>%
     y = TeX(r'($CO_2$ parts per million)')
   )
 ```
-\newpage
 
-<!--
+
 # Your Assignment 
 
 Your goal in this assignment is to produce a comprehensive analysis of the Mona Loa CO2 data that you will be read by an interested, supervising data scientist. Rather than this being a final report, you might think of this as being a contribution to your laboratory. You and your group have been initially charged with the task of investigating the trends of global CO2, and told that if you find "anything interesting" that the team may invest more resources into assessing the question. 
@@ -463,12 +461,10 @@ pred_date_upper <- round(max_date_pred_values$`95%_upper`, 2)
 
 # Difference between predicted and actual on max date
 pred_act_diff <- max_actual_value - pred_date_average
-
 ```
 
 We originally predicted that CO2 would cross the 420 ppm threshold for the first time on `r fc_420_first_time` with an expected value of `r fc_420_first_mean` with a 95% confidence interval between `r fc_420_first_lower` - `r fc_420_first_upper`. The maximum average monthly value to date is `r max_actual_value` on `r max_actual_date`. In our predictions, the nearest date with a value at or over `r max_actual_value` is `r fc_417_first_time`. Therefore, our predicted average CO2 values were approximately 10-years behind the actuals. When comparing our predicted values in `r max_actual_date` to the actual data, we observe an average predicted value of `r pred_date_average` with a 95% confidence interval between `r pred_date_lower` - `r pred_date_upper`. Although our predicted average value was lower than the actual by value by `r pred_act_diff` ppm, the actual value of `r max_actual_value` is between our 95% confidence interval `r pred_date_lower` - `r pred_date_upper`.
 
-After reflecting on your performance on this threshold-prediction task, continue to use the weekly data to generate a month-average series from 1997 to the present, and compare the overall forecasting performance of your models from Parts 2a and 3b over the entire period. (You should conduct formal tests for this task.) 
 
 ```{r linear time trend model to present}
 # Build model
@@ -693,121 +689,59 @@ Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) 
 
 ```{r, seasonally adjust data, echo=FALSE}
 # Seasonally adjusted data
-co2_present_season <- co2_present %>%
-  model(stl = STL(average))
+co2_sa <- co2_present %>%
+  model(stl = STL(average)) %>%
+  components() %>%
+  as_tsibble()
 ```
 
-```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-# Plot & check
-s_plot <- components(co2_present_season) %>%
-  as_tsibble() %>%
-  autoplot(average, colour="gray") +
-  geom_line(aes(y=trend), colour = "#D55E00") +
-  labs(title = "CO2 Emissions with Seasonal Trend",
-       x = "Date",
-       y = TeX(r'($CO_2$ parts per million)')
-  )
-
-s_plot
-```
+Splitting both the SA and NSA time series into training and test sets.
 
 ```{r, test and train for 2 datasets, message=FALSE}
-# Create data frame with season values 
-df_season <- as_tsibble(data.frame(components(co2_present_season)))
-
 # Test size
 test.size <- 24 # Months
-test.df <- co2_present %>%
-  filter(year > 2018) %>%
-  mutate(.mean = average) # used later for ggplot
+test.df <- tail(co2_present, test.size) %>%
+  mutate(.mean = average) # Used later for ggplot
 
 # Train for non-seasonal (ns)
-train_ns <- co2_present %>%
-  slice(1:(n() - test.size))
+train_ns <- head(co2_present, nrow(co2_present) -  test.size)
            
 # Train for seasonal (s)
-train_s <-  df_season %>%
-  slice(1:(n() - test.size))
-
-head(train_s)
+train_s <- head(co2_sa, nrow(co2_sa) -  test.size) %>%
+  subset(select=-c(.model))
 ```
+
+### Training the ARIMA Model on the NSA Data
 
 ```{r}
 adf.test(train_ns$average, alternative = "stationary")
 ```
+The ADF test statistic and p-value come out to be equal to -0.72 and 0.96 respectively. Since the p-value is greater than 0.05, we would fail to reject the null hypothesis that the time series is non-stationary. Thus, we will apply differencing in order to attempt to make the time series stationary.
 
-```{r, unit root test on non seasonal data}
-train_ns %>% features(average, unitroot_kpss)
-```
-
-```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-# Getting the overall CO2 values
-value <- train_ns$average
-
-# Making four different plots for evaluation
-par(mfrow=c(2,2), mar = c(4.1, 4.1, 3, 2))
-plot(value, type = "l", col="orange2", main="CO2 time series",
-     xlab="Time", ylab="CO2 rate")
-pacf(value, col="gold3", main="PACF of CO2")
-acf(value, col="darkorange2", main="ACF of CO2")
-hist(value, main="CO2 Distribution",
-     ylab = "Frequency", xlab="CO2")
-
-```
-
-The ADF test statistic and p-value come out to be equal to -0.72 and 0.96, respectively. Since the p-value is greater than 0.05, we would fail to reject the null hypothesis that the time series is non-stationary. Similarly, the p-value is reported as 0.01 and the test statistic (10.36) is bigger than the 1% critical value, and the p-value is less than 0.01, indicating that the null hypothesis is rejected and the data is not stationary. The plots show a clear seasonal trend in the time series plot. The PACF shows strong correlation at time lag 1 and then a slightly negative correlation around time 12. The ACF shows strong correlation between the all periods between 0 and 30, which is most likely indicative of the the positive trend in CO2 emissions. 
-
-
-```{r, check differencing for ns model, warning=FALSE, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
+```{r, check differencing for ns model, warning=FALSE, echo=FALSE, fig.align='center', fig.height=2, fig.width=10}
 # check the different values: 
 ns_diff <- train_ns %>%
-  mutate(first_diff_season = difference(average, 12)) %>%
-  mutate(second_diff = difference(difference(average, 12)), 1) %>%
-  mutate(third_diff = difference(difference(average, 12)), 2) 
+  mutate(first_diff_season = difference(average, differences = 1)) %>%
+  mutate(second_diff = difference(average, 2)) 
 
 # Plot & check
-n2_plot1 <- ns_diff %>%  
+ns_diff %>%  
   ggplot(aes(x = time_index, y = first_diff_season)) +
   geom_line() +
   labs(title = "First Difference", x = "Time", y = "Residuals")
-
-# Plot & check
-n2_plot2 <- ns_diff %>%  
-  ggplot(aes(x = time_index, y = second_diff)) +
-  geom_line() +
-  labs(title = "Second Difference", x = "Time", y = "Residuals")
-
-grid.arrange(n2_plot1, n2_plot2, ncol=1)
 ```
 
-```{r plot second difference for ns, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-# Select 2nd differencing
-diff_level_ns <- difference(difference(train_ns$average, 12), 1) 
-diff_level_ns <- na.omit(diff_level_ns) 
+Based on the above plot, it would appear that the first difference appears to be stationary. We will verify with an ADF test.
 
-# Making four different plots for evaluation
-par(mfrow=c(2,2), mar = c(4.1, 4.1, 3, 2))
-plot(diff_level_ns, type = "l", col="orange2", main="Time series of all data")
-pacf(diff_level_ns, col="gold3", main="PACF for all data")
-acf(diff_level_ns, col="darkorange2", main="ACF for all data")
-hist(diff_level_ns, main="Value Distribution")
-```
-```{r}
+```{r, warning=FALSE}
 ns_diff_data <- train_ns %>%
-  mutate(second_diff = difference(difference(average, 12)), 1) %>%
+  mutate(second_diff = difference(average, differences = 1)) %>%
   filter(!is.na(second_diff))
   
 adf.test(ns_diff_data$second_diff, alternative = "stationary")
 ```
 
-
-```{r, unit root test on non seasonal data second time}
-train_ns %>%
-  mutate(second_diff = difference(difference(average, 12)), 1) %>%
-  features(second_diff, unitroot_kpss)
-```
-
-The ADF test statistic and p-value come out to be equal to -8.8912 and 0.01, respectively. Since the p-value is less than 0.05, we would reject the null hypothesis that the time series is non-stationary. Similarly, the p-value is reported as 0.1 and the test statistic (0.007) is less than the 1% critical value, and the p-value is greater than 0.01, indicating that the null hypothesis is not rejected and the data is stationary. Although the plots show that residual time series plot is similar to white noise and the residual histogram appears to normally distriubted, the PACF and the ACF has values beyond the threshold values around the 12-month mark. We applied a log transformation but this did not improve the residual plots. Because we know we should use first differencing, and 1 seasonal difference, we will set these hyper parameters and then select a model by the lowest aic  
+The ADF test statistic and p-value come out to be equal to -34.717 and 0.01, respectively. Since the p-value is less than 0.05, we would reject the null hypothesis that the time series is non-stationary. Because we know we should use first differencing, we will set these hyper parameters and then select a model with the lowest BIC.
 
 ```{r}
 model.ns <- train_ns %>%
@@ -820,14 +754,11 @@ model.ns %>%
 ```{r, echo=FALSE, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
 # Print residuals 
 model.ns %>%
-  gg_tsresiduals() + 
+  gg_tsresiduals() +
   labs(title = "Non-seasonal ARIMA Plot")
 ```
 
-```{r, adj test}
-augment(model.ns) %>%
-  features(.innov, ljung_box, dof = 14, lag = 24)
-```
+The residual plots for the ARIMA model appear to have constant variance and a mean near zero. The histogram also appears to be normally distributed. 
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}  
 # Forecast over the entire period
@@ -836,103 +767,60 @@ fc_24_ns <- forecast(model.ns, h = 24)
 far_plot <- fc_24_ns %>%
   autoplot(train_ns) +
   labs(
-    title = "Forecasts of CO2 Level Up To 2022 Asing ARIMA",
-    y = "CO2 Level", x = "Time"
+    title = "ARIMA Forecast Using Non-Seasonally-Adjusted Present Data",
+    y = "CO2 Level", x = ""
   )
 
 near_plot <- ggplot(NULL, aes(x = time_index, y = .mean)) + 
   geom_line(data = fc_24_ns, col = "blue") +
   geom_line(data = test.df, col = "black") +
-  labs(title = "Arima Model Vs. Actuals",
+  labs(title = "Arima Forecast Vs. Actuals",
        subtitle = "Blue = Predicted", 
        x = "Time", 
        y = "CO2 Emissions")
 
 grid.arrange(far_plot, near_plot, ncol=1)
-
 ```
 
-The residual plots for the ARIMA model appear to have constant variance and a mean near zero. The residuals pass the ljung_box test and all residual values are within the threshold values for ACF. The histogram also appears to be normally distributed. The forecast plots seem to track nicely with the actuals for the 24 month period.  
+The forecast plots seem to track nicely with the actuals for the 24 month period.
+
+
+### Training the ARIMA Model on the SA Data
+
+We will perform an ADF test to determine whether the seasonally-adjusted data is stationary.
 
 ```{r}
 adf.test(train_s$season_adjust, alternative = "stationary")
 ```
+The ADF test statistic and p-value come out to be equal to -0.33 and 0.9895 respectively. Since the p-value is greater than 0.05, we would fail to reject the null hypothesis that the time series is non-stationary. Thus, we will apply differencing in order to attempt to make the time series stationary.
 
-```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-# Getting the overall CO2 values
-value <- train_s$season_adjust
-
-# Making four different plots for evaluation
-par(mfrow=c(2,2), mar = c(4.1, 4.1, 3, 2))
-plot(value, type = "l", col="orange2", main="CO2 time series",
-     xlab="Time", ylab="CO2 rate")
-pacf(value, col="gold3", main="PACF of CO2")
-acf(value, col="darkorange2", main="ACF of CO2")
-hist(value, main="CO2 Distribution",
-     ylab = "Frequency", xlab="CO2")
-
-```
-
-The ADF test statistic and p-value come out to be equal to -0.33 and 0.99, respectively. Since the p-value is greater than 0.05, we would fail to reject the null hypothesis that the time series is non-stationary. . The plots show a positive trend in the time series plot. The PACF shows strong correlation at time lag 1 and then no correlation thereafter. The ACF shows strong correlation between the all periods between 0 and 30, which is most likely indicative of the the positive trend in CO2 emissions. The histogram is positively skewed to the right.  
-
-```{r, check differencing for s model, warning=FALSE, echo=FALSE, fig.align='center', fig.height=6, fig.width=10}
+```{r, check differencing for s model, warning=FALSE, echo=FALSE, fig.align='center', fig.height=2, fig.width=10}
 # check the different values: 
 s_diff <- train_s %>%
-  mutate(first_diff = difference(season_adjust, 1)) %>%
-  mutate(second_diff = difference(season_adjust, 2)) %>%
-  mutate(season_and_diff = difference(difference(season_adjust, 12)), 1)
+  mutate(second_diff = difference(season_adjust, 2))
 
 # Plot & check
-s2_plot1 <- s_diff %>%  
-  ggplot(aes(x = time_index, y = first_diff)) +
-  geom_line() +
-  labs(title = "First Difference", x = "Time", y = "Residuals")
-
-# Plot & check
-s2_plot2 <- s_diff %>%  
+s_diff %>%  
   ggplot(aes(x = time_index, y = second_diff)) +
   geom_line() +
   labs(title = "Second Difference", x = "Time", y = "Residuals")
-
-# Plot & check
-s2_plot3 <- s_diff %>%  
-  ggplot(aes(x = time_index, y = season_and_diff)) +
-  geom_line() +
-  labs(title = "Season & Diff", x = "Time", y = "Residuals")
-
-
-grid.arrange(s2_plot1, s2_plot2, s2_plot3, ncol=1)
-  
 ```
+Based on the above plot, it would appear that the first difference appears to be stationary. We will verify with an ADF test.
 
-```{r}
+```{r, warning=FALSE}
 s_diff_data <- train_s %>%
-  mutate(season2_diff1 = difference(season_adjust, 1)) %>%
-  filter(!is.na(season2_diff1))
+  mutate(first_diff = difference(season_adjust, 2)) %>%
+  filter(!is.na(first_diff))
   
-adf.test(s_diff_data$season2_diff1, alternative = "stationary")
+adf.test(s_diff_data$first_diff, alternative = "stationary")
 ```
+The ADF test statistic and p-value come out to be equal to -7.86 and 0.01 respectively. Since the p-value is less than 0.05, we could reject the null hypothesis that the time series is non-stationary.
 
-
-```{r, echo=FALSE, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-# Select 2nd differencing
-diff_level_s <- difference(train_s$season_adjust, 1)
-diff_level_s <- na.omit(diff_level_s) 
-
-# Making four different plots for evaluation
-par(mfrow=c(2,2), mar = c(4.1, 4.1, 3, 2))
-plot(diff_level_s, type = "l", col="orange2", main="Time series of all data")
-pacf(diff_level_s, col="gold3", main="PACF for all data")
-acf(diff_level_s, col="darkorange2", main="ACF for all data")
-hist(diff_level_s, main="Value Distribution")
-```
-
-The ADF test statistic and p-value come out to be equal to -8.82 and 0.01, respectively. Since the p-value is less than 0.05, we could reject the null hypothesis that the time series is non-stationary. The time series plot appears to have white noise at a difference of 1. The PACF demonstrates some outlier values at a time lag of 1 and around the 12 the and 24 month lag.  Similarly, the ACF has high values at these same lags. The histogram of the residuals appearls to be normally distributed. Due to these results, we decided to use a first difference of 1 or 2, a seasonal difference of 0, and we let the ARIMA function choose the remaining hyper parameters.  
-
+Due to these results, we decided to use a second difference and a seasonal difference of 0, and we let the ARIMA function choose the remaining hyper parameters.  
 
 ```{r}
 model.s <- train_s %>%
-  model(ARIMA(season_adjust ~ 0 + pdq(0:10, 1:2, 0:10) + PDQ(0:10, 0, 0:10),
+  model(ARIMA(season_adjust ~ 0 + pdq(0:10, 2, 0:10) + PDQ(0:10, 0, 0:10),
                        ic="bic", stepwise=F, greedy=F))
 model.s %>%
   report()
@@ -943,7 +831,6 @@ model.s %>%
 model.s %>%
   gg_tsresiduals() + 
   labs(title = "Seasonal ARIMA Plot")
-
 ```
 ```{r, adj test for seasonal}
 augment(model.s) %>%
@@ -954,12 +841,11 @@ augment(model.s) %>%
 # Forecast over the entire period
 fc_24_s <- forecast(model.s, h = 24)
 
-
 far_plot_2 <- fc_24_s %>%
   autoplot(train_s) +
   labs(
-    title = "Forecasts of CO2 level upto 2022 using ARIMA",
-    y = "CO2 Level", x = "Time"
+    title = "ARIMA Forecast Using Seasonally-Adjusted Present Data",
+    y = "CO2 Level", x = ""
   )
 
 near_plot2 <- ggplot(NULL, aes(x = time_index, y = .mean)) + 
@@ -974,9 +860,9 @@ grid.arrange(far_plot_2, near_plot2, ncol=1)
 
 ```
 
-The ARIMA hyper parameters that were selected include the following: ARIMA(1,2,1)(4,0,0)[12]. Using these values, the residual plots appear to meet the conditin of constant variance and a mean near zero. The test results also past the ljung_box statistical test. The ACF had some extreme values at the 2nd and 24th time lag, which seems a bit strange. The forecast estimates appear strange when juxtaposed next to the monthly data inclusive of the seasonal trends but that is because the underlying seasonality has been removed. 
+The ARIMA hyper parameters that were selected include the following: ARIMA(1,2,1)(4,0,0)[12]. Using these values, the residual plots appear to meet the condition of constant variance and a mean near zero. The test results also past the ljung_box statistical test. The ACF had some extreme values at the 2nd and 24th time lag, which seems a bit strange. The forecast estimates appear strange when juxtaposed next to the monthly data inclusive of the seasonal trends but that is because the underlying seasonality has been removed. 
 
-
+### Training the Polynomial Time-Trend Model on the SA Data
 
 ```{r polynomial time trend with adjusted seaonal data}
 # Build model
@@ -994,9 +880,9 @@ fit_poly %>%
   labs(title = "Residual Plots: Polynomial Model")
 ```
 
-The residual diagnostic plots do no produce promising results. The residual time series does not have a constant variance or mean, and it is not clear that the mean is near zero. All values within the ACF exceed the threshold values and the histogram of the residuals appears to be skewed to the right. 
+The residual diagnostic plots does not produce promising results. The residual time series does not have a constant variance or mean, and it is not clear that the mean is near zero. All values within the ACF exceed the threshold values and the histogram of the residuals appears to be skewed to the right. 
 
-As a result, we have decided to go with the ARIMA model because it adjusts for the underlying seasonality, which we may need to adjust going forward, all of its residual values are are within the acceptable bands of the ACF, and it is easier to explain the model results to a non-technical audience. The ARIMA model includes the following features: Model: ARIMA(1,1,1)(2,1,1)[12] 
+As a result, we have decided to go with the `ARIMA(1,1,1)(2,1,1)[12]` model because it adjusts for the underlying seasonality, which we may need to adjust going forward, all of its residual values are are within the acceptable bands of the ACF, and it is easier to explain the model results to a non-technical audience.
 
 
 ## (3 points) Task Part 6b: How bad could it get?
@@ -1005,15 +891,13 @@ With the non-seasonally adjusted data series, generate predictions for when atmo
 -->
 \hrulefill
 
+We will now retrain the selected model on all of the available data.
+
 ```{r, arima model based on train data}
 model.bic3 <- co2_present %>%
-  model(ARIMA(average ~ 0 + pdq(1, 1, 1) + PDQ(2, 1, 1),
-                       ic="bic"))
-
-model.bic3 %>%
-  report()
+  model(ARIMA(average ~ 0 + pdq(1, 1, 1) + PDQ(2, 1, 1), ic="bic"))
 ```
-
+Now we will get predictions from the model.
 
 ```{r, prediction 420 ppm from 2021 on}
 # Prediction from 2021 to 2121
