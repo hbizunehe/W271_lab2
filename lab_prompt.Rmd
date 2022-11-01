@@ -10,25 +10,22 @@ output:
 ---
 
 ```{r load packages, echo = FALSE, message = FALSE, warning=FALSE}
-list.of.packages <- c("tidyverse", "tsibble", "latex2exp", "fpp3", "tseries", "fable", "gridExtra", "MASS", "patchwork")
+list.of.packages <- c("tidyverse", "tsibble", "latex2exp", "fpp3", "tseries", "fable", "gridExtra", "MASS", "patchwork", "forecast", "lubridate", "feasts", "lmtest", "aTSA")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 
 library(tidyverse)
 library(tsibble)
 library(latex2exp)
-
 library(fpp3)
 library(tseries) 
 library(fable)
-
 library(gridExtra)
 library(MASS)
 library(patchwork)
 library(forecast)
 library(lubridate)
 library(feasts)
-# library(sandwich)
 library(lmtest)
 library(aTSA)
 
@@ -84,11 +81,11 @@ Introduce the question to your audience. Suppose that they _could_ be interested
 - [Autobiography of Keeling](./background/keeling_annual_review.pdf)
 -->
 
+\hrulefill
+
 Global temperatures are rising at a steady and alarming rate. This phenomenon is commonly referred to as climate change and it has been linked to anthropogenic emissions - greenhouse gas emissions associated with human activities like deforestation and the burning of fossil fuels. The climate change phenomenon has been well documented by notable researchers, including Charles David Keeling who is known for creating the Keeling Curve, a visualization that shows the change in the concentration of carbon dioxide in the Earth’s atmosphere from 1959 to the present. We will use the same data that underpins the Keeling Curve to answer the following research questions: 1) How have carbon emissions increased over time? 2) What is the expected level of carbon emissions? To answer these research questions, we will apply time-series analysis to atmospheric C02 concentration data collected from Mauna Loa, Hawaii.  
 
 Our team will construct a time-series model that shows how carbon emissions have increased over the past 38 years. More importantly, we will predict how much we should expect carbon emissions to rise if nothing is done to reduce anthropogenic emissions. These findings will be important because increasing carbon emissions have the potential to threaten our way of life, resulting in higher temperatures, rising sea levels, and increased frequency of extreme weather events, among other threats. We are hoping these findings will be used to develop company strategies and actions that will reduce our carbon footprint for the betterment of our planet. We also hope these findings will be used to encourage people at our company to take measures that will reduce their carbon emission contributions.
-
-\hrulefill
 
 ## (3 points) Task 1a: CO2 data
 <!--
@@ -135,9 +132,10 @@ as_tsibble(co2) -> co2_ts
 
 co2_ts %>%
   model(TSLM(value ~ trend())) -> fit_co2_trend
+```
 
-## please uncomment for details. Commenting for now for brevity.
-# report(fit_co2_trend)
+```{r, echo=FALSE, results='hide'}
+report(fit_co2_trend)
 ```
 
 The linear time trend models estimates an increase of 0.11 in CO2 levels per month. The model residuals are shown below. 
@@ -155,9 +153,10 @@ Note that we have not shown the Dickey-Fuller test here since the plot shows the
 ```{r quadratic time trend model}
 co2_ts %>%
   model(TSLM(value ~ trend()+ I(trend()^2))) -> fit_co2_quad_trend
+```
 
-## please uncomment for details. Commenting for now for brevity.
-# report(fit_co2_quad_trend)
+```{r, echo=FALSE, results='hide'}
+report(fit_co2_quad_trend)
 ```
 
 ```{r quadratic time trend model residuals, echo=FALSE, fig.align='center', fig.width=10, fig.height=4}
@@ -172,10 +171,12 @@ The variance in the data is not increasing at higher values, meaning we do not n
 
 ```{r quadratic time trend with season model}
 co2_ts %>%
-  model(TSLM(value ~ trend() + I(trend()^2) + I(trend()^3) + season())) -> fit_co2_full_trend
+  model(TSLM(value ~ trend() + I(trend()^2) + I(trend()^3) + 
+               season())) -> fit_co2_full_trend
+```
 
-## please uncomment for details. Commenting for now for brevity.
-#report(fit_co2_full_trend)
+```{r, echo=FALSE, results='hide'}
+report(fit_co2_full_trend)
 ```
 
 ```{r quadratic time trend with season model residuals, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
@@ -187,7 +188,7 @@ Using seasonality and polynomial time trend, we are able to remove the seasonali
 
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-fc_co2_2020 <- fabletools::forecast(fit_co2_full_trend, h=36)
+fc_co2_2020 <- fabletools::forecast(fit_co2_full_trend, h=276)
 
 fc_co2_2020 %>%
   autoplot(co2_ts) +
@@ -219,7 +220,7 @@ acf(diff_level, col="darkorange2", main="ACF for first-order differenced data")
 hist(diff_level, main="First-order differenced Data Distribution")
 ```
 
-'In Task 1a, we determined that the time series is not stationary. First-order differencing, performed above, removes the non-seasonal trend from the series. However, the plots above show seasonality: the ACF shows oscillating correlations every 12 months, implying seasonality. To create a stationary timeseries, we need to add in seasonal differencing: 
+In Task 1a, we determined that the time series is not stationary. First-order differencing, performed above, removes the non-seasonal trend from the series. However, the plots above show seasonality: the ACF shows oscillating correlations every 12 months, implying seasonality. To create a stationary timeseries, we need to add in seasonal differencing: 
 
 ```{r plot second diff CO2 level, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
 # Getting the differenced CO2 levels; first and seasonal differecing
@@ -238,12 +239,15 @@ tseries::adf.test(diff(diff(co2_ts$value), lag=12),
          alternative = "stationary", k = 3)
 ```
 
-'The Dickey-Fuller test, for the first-order differenced (seasonal as well as non-seasonal) series, rejects the null hypothesis (which states that the time series is not stationary). The time series plot (upper-left panel) appears to be stationary as well. Significant correlations at different lags on both ACF and PACF suggest that the process is ARMA. The differenced-data distribution is normal; this will help in constructing asymptotic confidence intervals. Next, we will search for a model that minimizes AICc after applying first-order seasonal and non-seasonal differencing.'  
+The Dickey-Fuller test, for the first-order differenced (seasonal as well as non-seasonal) series, rejects the null hypothesis (which states that the time series is not stationary). The time series plot (upper-left panel) appears to be stationary as well. Significant correlations at different lags on both ACF and PACF suggest that the process is ARMA. The differenced-data distribution is normal; this will help in constructing asymptotic confidence intervals. Next, we will search for a model that minimizes AICc after applying first-order seasonal and non-seasonal differencing.
 
 ```{r}
 model.aicc <- co2_ts %>%
   model(ARIMA(value ~ 0 + pdq(0:10, 1, 0:10) + PDQ(0:10, 1, 0:10),
                        ic="aicc", stepwise=F, greedy=F))
+```
+
+```{r, echo=FALSE, results='hide'}
 model.aicc %>% report()
 ```
 
@@ -261,10 +265,10 @@ Box.test(resid.ts, lag = 1, type = "Ljung-Box")
 Box.test(resid.ts, lag = 10, type = "Ljung-Box")
 ```
 
-'After performing first and seasonal differencing, we searched for the number of AR and MA terms for both seasonal and non-seasonal parts of the SARIMA model that minimizes AICc. We found a model with three non-seasonal MA terms, one seasonal AR term, and two seasonal MA terms that can better fit the data. We also examined the residuals, which show no systematic relationships and it has only one minor significant correlation. The Box-Ljung test also shows that the null hypothesis, which is that data are independently distributed, is not rejected. So we can say that the residuals are white noise.'   
+After performing first and seasonal differencing, we searched for the number of AR and MA terms for both seasonal and non-seasonal parts of the SARIMA model that minimizes AICc. We found a model with three non-seasonal MA terms, one seasonal AR term, and two seasonal MA terms that can better fit the data. We also examined the residuals, which show no systematic relationships and it has only one minor significant correlation. The Box-Ljung test also shows that the null hypothesis, which is that data are independently distributed, is not rejected. So we can say that the residuals are white noise.
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-fc_co2_2022 <- fabletools::forecast(model.aicc, h=60)
+fc_co2_2022 <- fabletools::forecast(model.aicc, h=276)
 
 fc_co2_2022 %>%
   autoplot(co2_ts) +
@@ -274,7 +278,7 @@ fc_co2_2022 %>%
   )
 ```
 
-'The ARIMA does a reasonable job of predicting the trend and seasonality. Comparing it with the actual observed values will be helpful in evaluating if the model is useful. Compared to the linear regression forecast, the ARIMA model has a wider confidence interval.'   
+The ARIMA does a reasonable job of predicting the trend and seasonality. Comparing it with the actual observed values will be helpful in evaluating if the model is useful. Compared to the linear regression forecast, the ARIMA model has a wider confidence interval.
 
 ## (3 points) Task 4a: Forecast atmospheric CO2 growth 
 <!--
@@ -282,7 +286,8 @@ Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](htt
 -->
 \hrulefill
 
-```{r prediction}
+
+```{r prediction, echo=FALSE}
 fc_100_years <- fabletools::forecast(model.aicc, h=1236) %>%
   hilo() %>%
   unpack_hilo(c(`80%`, `95%`))
@@ -292,7 +297,11 @@ fc_100_years %>%
 
 fc_100_years %>%
   filter(.mean >= 500 & .mean < 501) -> fc_500
+```
 
+The code for calculating the following values has been excluded for brevity. Please refer to the Rmd file to see how they were calculated.
+
+```{r, echo=FALSE}
 # 420 PPM levels for the first and last time
 fc_420_first <- head(fc_420, n =1)
 fc_420_last  <- tail(fc_420, n =1)
@@ -329,15 +338,17 @@ fc_2100_upper <- round(fc_2100$`95%_upper`, 2)
 fc_2100_mean  <- round(fc_2100$.mean, 2)
 ```
 
-'CO2 is expected to be at 420 ppm level for the first time on `r fc_420_first_time` with expected value of `r fc_420_first_mean` and `r fc_420_first_lower` - `r fc_420_first_upper` 95% confidence interval.'   
+CO2 is expected to be at 420 ppm level for the first time on `r fc_420_first_time` with expected value of `r fc_420_first_mean` and `r fc_420_first_lower` - `r fc_420_first_upper` 95% confidence interval.
 
-'CO2 is expected to be at 420 ppm level for the last time on `r fc_420_last_time` with expected value of `r fc_420_last_mean` and `r fc_420_last_lower` - `r fc_420_last_upper` 95% confidence interval.'   
+CO2 is expected to be at 420 ppm level for the last time on `r fc_420_last_time` with expected value of `r fc_420_last_mean` and `r fc_420_last_lower` - `r fc_420_last_upper` 95% confidence interval.
 
-'CO2 is expected to be at 500 ppm level for the first time on `r fc_500_first_time` with expected value of `r fc_500_first_mean` and `r fc_500_first_lower` - `r fc_500_first_upper` 95% confidence interval.'   
+CO2 is expected to be at 500 ppm level for the first time on `r fc_500_first_time` with expected value of `r fc_500_first_mean` and `r fc_500_first_lower` - `r fc_500_first_upper` 95% confidence interval. 
 
-'CO2 is expected to be at 500 ppm level for the last time on `r fc_500_last_time` with expected value of `r fc_500_last_mean` and `r fc_500_last_lower` - `r fc_500_last_upper` 95% confidence interval.'   
+CO2 is expected to be at 500 ppm level for the last time on `r fc_500_last_time` with expected value of `r fc_500_last_mean` and `r fc_500_last_lower` - `r fc_500_last_upper` 95% confidence interval.
 
-'By the end of 2100 year, the CO2 is expected to be at `r fc_2100_mean` ppm level with `r fc_2100_lower` - `r fc_2100_upper` 95% confidence interval.'   
+By the end of 2100 year, the CO2 is expected to be at `r fc_2100_mean` ppm level with `r fc_2100_lower` - `r fc_2100_upper` 95% confidence interval.
+
+\newpage
 
 # Report from the Point of View of the Present 
 <!--
@@ -349,6 +360,9 @@ One of the very interesting features of Keeling and colleagues' research is that
 In this introduction, you can assume that your reader will have **just** read your 1997 report. In this introduction, **very** briefly pose the question that you are evaluating, and describe what (if anything) has changed in the data generating process between 1997 and the present. 
 -->
 \hrulefill
+
+In our original 1997 paper, we made several predictions on the expected level carbon emissions. Now that enough time has passed, we will evaluate the accuracy of those predictions using time series analysis and extrapolate from present data to make predictions about the future.
+
 
 ## (3 points) Task 1b: Create a modern data pipeline for Mona Loa CO2 data.
 <!--
@@ -654,6 +668,9 @@ The ADF test statistic and p-value come out to be equal to -34.717 and 0.01, res
 model.ns <- train_ns %>%
   model(ARIMA(average ~ 0 + pdq(0:10, 1, 0:10) + PDQ(0:10, 1, 0:10),
                        ic="bic", stepwise=F, greedy=F))
+```
+
+```{r, echo=FALSE, results='hide'}
 model.ns %>%
   report()
 ```
@@ -725,10 +742,13 @@ The ADF test statistic and p-value come out to be equal to -7.86 and 0.01 respec
 
 Due to these results, we decided to use a second difference and a seasonal difference of 0, and we let the ARIMA function choose the remaining hyper parameters.  
 
-```{r}
+```{r, warning=FALSE}
 model.s <- train_s %>%
   model(ARIMA(season_adjust ~ 0 + pdq(0:10, 2, 0:10) + PDQ(0:10, 0, 0:10),
                        ic="bic", stepwise=F, greedy=F))
+```
+
+```{r, echo=FALSE, results='hide'}
 model.s %>%
   report()
 ```
@@ -775,7 +795,9 @@ The ARIMA hyper parameters that were selected include the following: ARIMA(1,2,1
 # Build model
 train_s %>%
   model(TSLM(season_adjust ~ trend() + I(trend()^2) + I(trend()^3))) -> fit_poly
+```
 
+```{r, echo=FALSE, results='hide'}
 # Print model
 report(fit_poly)
 ```
@@ -803,10 +825,7 @@ We will now retrain the selected model on all of the available data.
 ```{r, arima model based on train data}
 model.bic3 <- co2_present %>%
   model(ARIMA(average ~ 0 + pdq(1, 1, 1) + PDQ(2, 1, 1), ic="bic"))
-```
-Now we will get predictions from the model.
 
-```{r, prediction 420 ppm from 2021 on}
 # Prediction from 2021 to 2121
 fc2_100 <- fabletools::forecast(model.bic3, h=1224) %>%
   hilo() %>%
@@ -815,6 +834,13 @@ fc2_100 <- fabletools::forecast(model.bic3, h=1224) %>%
 fc2_100 %>%
   filter(.mean >= 420 & .mean < 421) -> fc2_420
 
+fc2_100 %>%
+  filter(.mean >= 500 & .mean < 501) -> fc2_500
+```
+
+The code for calculating the following values has been excluded for brevity. Please refer to the Rmd file to see how they were calculated.
+
+```{r, prediction 420 ppm from 2021 on, echo=FALSE}
 # 420 PPM levels for the first and last time
 fc2_420_first <- head(fc2_420, n =1)
 fc2_420_last  <- tail(fc2_420, n =1)
@@ -833,10 +859,7 @@ fc2_420_last_mean  <- round(fc2_420_last$.mean, 2)
 
 Based on the findings from our model, we predict that CO2 will cross the 420 ppm threshold for the first time on `r fc2_420_first_time` with an expected value of `r fc2_420_first_mean` with a 95% confidence interval between `r fc2_420_first_lower` - `r fc2_420_first_upper`. Our model also predicts that the last time CO2 will be between the 420 and 421 ppm threshold will be on `r fc2_420_last_time` with an expected value of `r fc2_420_last_mean` with a 95% confidence interval between `r fc2_420_last_lower` - `r fc2_420_last_upper`.
 
-```{r, prediction 500 ppm from 2021 on}
-fc2_100 %>%
-  filter(.mean >= 500 & .mean < 501) -> fc2_500
-
+```{r, prediction 500 ppm from 2021 on, echo=FALSE}
 # 420 PPM levels for the first and last time
 fc2_500_first <- head(fc2_500, n =1)
 fc2_500_last  <- tail(fc2_500, n =1)
@@ -856,7 +879,7 @@ fc2_500_last_mean  <- round(fc2_500_last$.mean, 2)
 
 Based on the findings from our model, we predict that CO2 will cross the 500 ppm threshold for the first time on `r fc2_500_first_time` with an expected value of `r fc2_500_first_mean` with a 95% confidence interval between `r fc2_500_first_lower` - `r fc2_500_first_upper`. Our model also predicts that the last time CO2 will be between the 500 and 501 ppm threshold will be on `r fc2_500_last_time` with an expected value of `r fc2_500_last_mean` with a 95% confidence interval between `r fc2_500_last_lower` - `r fc2_500_last_upper`.
 
-```{r, prediction to 2122}
+```{r, prediction to 2122, echo=FALSE}
 # Atmospheric CO2 levels in the year 2122
 fc_2122  <- tail(fc2_100, n =1)
 
