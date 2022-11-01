@@ -83,6 +83,11 @@ Introduce the question to your audience. Suppose that they _could_ be interested
 - [First Publication](./background/keeling_tellus_1960.pdf)
 - [Autobiography of Keeling](./background/keeling_annual_review.pdf)
 -->
+
+Global temperatures are rising at a steady and alarming rate. This phenomenon is commonly referred to as climate change and it has been linked to anthropogenic emissions - greenhouse gas emissions associated with human activities like deforestation and the burning of fossil fuels. The climate change phenomenon has been well documented by notable researchers, including Charles David Keeling who is known for creating the Keeling Curve, a visualization that shows the change in the concentration of carbon dioxide in the Earth’s atmosphere from 1959 to the present. We will use the same data that underpins the Keeling Curve to answer the following research questions: 1) How have carbon emissions increased over time? 2) What is the expected level of carbon emissions? To answer these research questions, we will apply time-series analysis to atmospheric C02 concentration data collected from Mauna Loa, Hawaii.  
+
+Our team will construct a time-series model that shows how carbon emissions have increased over the past 38 years. More importantly, we will predict how much we should expect carbon emissions to rise if nothing is done to reduce anthropogenic emissions. These findings will be important because increasing carbon emissions have the potential to threaten our way of life, resulting in higher temperatures, rising sea levels, and increased frequency of extreme weather events, among other threats. We are hoping these findings will be used to develop company strategies and actions that will reduce our carbon footprint for the betterment of our planet. We also hope these findings will be used to encourage people at our company to take measures that will reduce their carbon emission contributions.
+
 \hrulefill
 
 ## (3 points) Task 1a: CO2 data
@@ -91,6 +96,7 @@ Conduct a comprehensive Exploratory Data Analysis on the `co2` series. This shou
 
 What you report in the deliverable should not be your own process of discovery, but rather a guided discussion that you have constructed so that your audience can come to an understanding as succinctly and successfully as possible. This means that figures should be thoughtfully constructed and what you learn from them should be discussed in text; to the extent that there is _any_ raw output from your analysis, you should intend for people to read and interpret it, and you should write your own interpretation as well.
 -->
+
 \hrulefill
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
@@ -110,13 +116,13 @@ hist(value, main="CO2 Distribution",
      ylab = "Frequency", xlab="CO2")
 ```
 
-> The top-left plot shows the timeseries over the period Jan 1959 through Jan 1997. A linear trend and annual seasonality are evident in the plot. 
+The top-left plot shows the timeseries over the period Jan 1959 through Jan 1997. A linear trend and annual seasonality are evident in the plot. 
 
-> The top-right plot shows the ACF (autocorrelation function) of the series at lags of 1 month. The correlogram shows both a gradual decay, which is a sign of a existance of a trend, and annual seasonality, shown by the spikes occuring every 12 months. 
+The top-right plot shows the ACF (autocorrelation function) of the series at lags of 1 month. The correlogram shows both a gradual decay, which is a sign of a existance of a trend, and annual seasonality, shown by the spikes occuring every 12 months. 
 
-> The bottom-left plot shows the PACF (partial autocorrelation function) of the series. The PACF also suggests some seasonality, due to the oscillating significant spikes at various lags. The PACF shows lags 1, 2, 12, and 13 to be significant. The high significance at different lag on the PACF might suggest that it is an ARMA process. 
+The bottom-left plot shows the PACF (partial autocorrelation function) of the series. The PACF also suggests some seasonality, due to the oscillating significant spikes at various lags. The PACF shows lags 1, 2, 12, and 13 to be significant. The high significance at different lag on the PACF might suggest that it is an ARMA process. 
 
-> Lastly, the bottom-right plot shows the histogram of the data and helps us understand its spread. The distribution has close to a uniform distribution, which is not ideal for asympototic confidence interval estimation (requires normality in the distribution of residuals). 
+Lastly, the bottom-right plot shows the histogram of the data and helps us understand its spread. The distribution has close to a uniform distribution, which is not ideal for asympototic confidence interval estimation (requires normality in the distribution of residuals). 
 
 ## (3 points) Task 2a: Linear time trend model
 <!--
@@ -134,21 +140,19 @@ co2_ts %>%
 # report(fit_co2_trend)
 ```
 
-> The linear time trend models estimates an increase of 0.11 in CO2 levels per month. The model residuals are shown below. 
+The linear time trend models estimates an increase of 0.11 in CO2 levels per month. The model residuals are shown below. 
 
 ```{r linear time trend model residuals, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
 fit_co2_trend %>%
   gg_tsresiduals()
 ```
 
-> The timeseries in the top panel show the seasonality in the residuals, meaning we need to adjust the model for seasonal effects. Additionally, the U-shape of the residuals against the time index suggests non-linearity in the underlying process: a polynomial trend model may be need to capture this shape. The seasonality in the data is reflected in the ACF, which shows oscillating significant lags. The histogram of the residuals is normally distributed.
+The timeseries in the top panel show the seasonality in the residuals, meaning we need to adjust the model for seasonal effects. Additionally, the U-shape of the residuals against the time index suggests non-linearity in the underlying process: a polynomial trend model may be need to capture this shape. The seasonality in the data is reflected in the ACF, which shows oscillating significant lags. The histogram of the residuals is normally distributed.
 
-> Note that we have not shown the Dickey-Fuller test here since the plot shows the series as being non-stationary. We have used the test later in the report when the plots are not very obvious in display stationarity in the series. 
+Note that we have not shown the Dickey-Fuller test here since the plot shows the series as being non-stationary. We have used the test later in the report when the plots are not very obvious in display stationarity in the series. 
 
 
 ```{r quadratic time trend model}
-as_tsibble(co2) -> co2_ts
-
 co2_ts %>%
   model(TSLM(value ~ trend()+ I(trend()^2))) -> fit_co2_quad_trend
 
@@ -162,13 +166,11 @@ fit_co2_quad_trend %>%
 ```
 
 
-> The quadratic model is able to capture some of the non-linearity in the data, reducing the exaggerated U-shape in the residuals in the top panel. The trend is not completely modeled and we will require a polynomial term to capture the trend. The corresponding ACF still shows seasonal effects in the data. The histogram of the residuals is normal.
+The quadratic model is able to capture some of the non-linearity in the data, reducing the exaggerated U-shape in the residuals in the top panel. The trend is not completely modeled and we will require a polynomial term to capture the trend. The corresponding ACF still shows seasonal effects in the data. The histogram of the residuals is normal.
 
-> The variance in the data is not increasing at higher values, meaning we do not need a log-transformation. 
+The variance in the data is not increasing at higher values, meaning we do not need a log-transformation. 
 
 ```{r quadratic time trend with season model}
-as_tsibble(co2) -> co2_ts
-
 co2_ts %>%
   model(TSLM(value ~ trend() + I(trend()^2) + I(trend()^3) + season())) -> fit_co2_full_trend
 
@@ -181,7 +183,7 @@ fit_co2_full_trend %>%
   gg_tsresiduals()
 ```
 
-> Using seasonality and polynomial time trend, we are able to remove the seasonality and non-linearity from the residuals: note the ACF does not show oscillating significant lags. However, we still have a case of heteroskedasticity in the residuals, shown by the non-constant variance in the top panel. The histogram shows normally distributed residuals. 
+Using seasonality and polynomial time trend, we are able to remove the seasonality and non-linearity from the residuals: note the ACF does not show oscillating significant lags. However, we still have a case of heteroskedasticity in the residuals, shown by the non-constant variance in the top panel. The histogram shows normally distributed residuals. 
 
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
@@ -195,7 +197,7 @@ fc_co2_2020 %>%
   )
 ```
 
-> The seasonality and polynomial time trend model produces forecasts that extrapolate the linear trend of the series and include the seasonality of the data. However, as noted in the sections above, the residuals of this model do not represent white noise. Hence, a better model may be possible for this data. 
+The seasonality and polynomial time trend model produces forecasts that extrapolate the linear trend of the series and include the seasonality of the data. However, as noted in the sections above, the residuals of this model do not represent white noise. Hence, a better model may be possible for this data. 
   
 
 ## (3 points) Task 3a: ARIMA times series model 
@@ -211,13 +213,13 @@ diff_level <- diff(co2_ts$value, lag=1)
 
 # Making six different plots for evaluation
 par(mfrow=c(3,2), mar = c(4.1, 4.1, 3, 2))
-plot(diff_level, type = "l", col="orange2", main="Time series of all data")
-pacf(diff_level, col="gold3", main="PACF for all data")
-acf(diff_level, col="darkorange2", main="ACF for all data")
-hist(diff_level, main="Value Distribution")
+plot(diff_level, type = "l", col="orange2", main="Time series of first-order differenced data")
+pacf(diff_level, col="gold3", main="PACF for first-order differenced data")
+acf(diff_level, col="darkorange2", main="ACF for first-order differenced data")
+hist(diff_level, main="First-order differenced Data Distribution")
 ```
 
-> 'In Task 1a, we determined that the time series is not stationary. To remove the trend part of the time series, we performed the first differencing, and the new time series shows us that the trend is removed, but the seasonality is still there. The ACF shows oscillate correlations every 12 months, showing seasonality. So we need to perform a seasonal differencing to make the time series stationary.'   
+'In Task 1a, we determined that the time series is not stationary. First-order differencing, performed above, removes the non-seasonal trend from the series. However, the plots above show seasonality: the ACF shows oscillating correlations every 12 months, implying seasonality. To create a stationary timeseries, we need to add in seasonal differencing: 
 
 ```{r plot second diff CO2 level, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
 # Getting the differenced CO2 levels; first and seasonal differecing
@@ -225,10 +227,10 @@ diff_level <- diff(diff(co2_ts$value, lag=1), lag=12)
 
 # Making four different plots for evaluation
 par(mfrow=c(2,2), mar = c(4.1, 4.1, 3, 2))
-plot(diff_level, type = "l", col="orange2", main="Time series of all data")
-pacf(diff_level, col="gold3", main="PACF for all data")
-acf(diff_level, col="darkorange2", main="ACF for all data")
-hist(diff_level, main="Value Distribution")
+plot(diff_level, type = "l", col="orange2", main="Time series of first-order (and seasonal) differenced data ")
+pacf(diff_level, col="gold3", main="PACF for first-order (and seasonal) differenced data")
+acf(diff_level, col="darkorange2", main="ACF for first-order (and seasonal) differenced data")
+hist(diff_level, main="Distribution for first-order (and seasonal) differenced data")
 ```
 
 ```{r adf test after first differencing and lag-12 differencing}
@@ -236,7 +238,7 @@ tseries::adf.test(diff(diff(co2_ts$value), lag=12),
          alternative = "stationary", k = 3)
 ```
 
-> 'The Dickey-Fuller test rejected the null hypothesis, which is that the time series is not stationary. The time series plot also visually looks stationary now. Significant correlations at different lags on both ACF and PACF might suggest that the process is ARMA. The distribution is normal, which will help to construct an asymptotic confidence interval. Next, we will search for a model that minimizes AICc after applying first and seasonal differencing.'  
+'The Dickey-Fuller test, for the first-order differenced (seasonal as well as non-seasonal) series, rejects the null hypothesis (which states that the time series is not stationary). The time series plot (upper-left panel) appears to be stationary as well. Significant correlations at different lags on both ACF and PACF suggest that the process is ARMA. The differenced-data distribution is normal; this will help in constructing asymptotic confidence intervals. Next, we will search for a model that minimizes AICc after applying first-order seasonal and non-seasonal differencing.'  
 
 ```{r}
 model.aicc <- co2_ts %>%
@@ -259,10 +261,10 @@ Box.test(resid.ts, lag = 1, type = "Ljung-Box")
 Box.test(resid.ts, lag = 10, type = "Ljung-Box")
 ```
 
-> 'After performing first and seasonal differencing, we searched for the number of AR and MA terms for both seasonal and non-seasonal parts of the ARIMA model that minimizes AICc. We found an ARIMA model with three non-seasonal MA terms, one seasonal AR term, and two seasonal MA terms that can better fit the data. We also examined the residuals, which show no systematic relationships and it has only one minor significant correlation. The Box-Ljung test also shows that the null hypothesis, which is that data are independently distributed, is not rejected. So we can say that the residuals are white noise.'   
+'After performing first and seasonal differencing, we searched for the number of AR and MA terms for both seasonal and non-seasonal parts of the SARIMA model that minimizes AICc. We found a model with three non-seasonal MA terms, one seasonal AR term, and two seasonal MA terms that can better fit the data. We also examined the residuals, which show no systematic relationships and it has only one minor significant correlation. The Box-Ljung test also shows that the null hypothesis, which is that data are independently distributed, is not rejected. So we can say that the residuals are white noise.'   
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}
-fc_co2_2022 <- fabletools::forecast(model.bic, h=60)
+fc_co2_2022 <- fabletools::forecast(model.aicc, h=60)
 
 fc_co2_2022 %>%
   autoplot(co2_ts) +
@@ -272,7 +274,7 @@ fc_co2_2022 %>%
   )
 ```
 
-> 'The ARIMA does a reasonable job of predicting the trend and seasonality. Comparing it with the actual observed values will be helpful in evaluating if the model is useful. Compared to the linear regression forecast, the ARIMA model has a wider confidence interval.'   
+'The ARIMA does a reasonable job of predicting the trend and seasonality. Comparing it with the actual observed values will be helpful in evaluating if the model is useful. Compared to the linear regression forecast, the ARIMA model has a wider confidence interval.'   
 
 ## (3 points) Task 4a: Forecast atmospheric CO2 growth 
 <!--
@@ -281,7 +283,7 @@ Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](htt
 \hrulefill
 
 ```{r prediction}
-fc_100_years <- fabletools::forecast(model.bic, h=1236) %>%
+fc_100_years <- fabletools::forecast(model.aicc, h=1236) %>%
   hilo() %>%
   unpack_hilo(c(`80%`, `95%`))
 
@@ -327,11 +329,15 @@ fc_2100_upper <- round(fc_2100$`95%_upper`, 2)
 fc_2100_mean  <- round(fc_2100$.mean, 2)
 ```
 
-> 'CO2 is expected to be at 420 ppm level for the first time on `r fc_420_first_time` with expected value of `r fc_420_first_mean` and `r fc_420_first_lower` - `r fc_420_first_upper` 95% confidence interval.'   
-> 'CO2 is expected to be at 420 ppm level for the last time on `r fc_420_last_time` with expected value of `r fc_420_last_mean` and `r fc_420_last_lower` - `r fc_420_last_upper` 95% confidence interval.'   
-> 'CO2 is expected to be at 500 ppm level for the first time on `r fc_500_first_time` with expected value of `r fc_500_first_mean` and `r fc_500_first_lower` - `r fc_500_first_upper` 95% confidence interval.'   
-> 'CO2 is expected to be at 500 ppm level for the last time on `r fc_500_last_time` with expected value of `r fc_500_last_mean` and `r fc_500_last_lower` - `r fc_500_last_upper` 95% confidence interval.'   
-> 'By the end of 2100 year, the CO2 is expected to be at `r fc_2100_mean` ppm level with `r fc_2100_lower` - `r fc_2100_upper` 95% confidence interval.'   
+'CO2 is expected to be at 420 ppm level for the first time on `r fc_420_first_time` with expected value of `r fc_420_first_mean` and `r fc_420_first_lower` - `r fc_420_first_upper` 95% confidence interval.'   
+
+'CO2 is expected to be at 420 ppm level for the last time on `r fc_420_last_time` with expected value of `r fc_420_last_mean` and `r fc_420_last_lower` - `r fc_420_last_upper` 95% confidence interval.'   
+
+'CO2 is expected to be at 500 ppm level for the first time on `r fc_500_first_time` with expected value of `r fc_500_first_mean` and `r fc_500_first_lower` - `r fc_500_first_upper` 95% confidence interval.'   
+
+'CO2 is expected to be at 500 ppm level for the last time on `r fc_500_last_time` with expected value of `r fc_500_last_mean` and `r fc_500_last_lower` - `r fc_500_last_upper` 95% confidence interval.'   
+
+'By the end of 2100 year, the CO2 is expected to be at `r fc_2100_mean` ppm level with `r fc_2100_lower` - `r fc_2100_upper` 95% confidence interval.'   
 
 # Report from the Point of View of the Present 
 <!--
@@ -528,8 +534,8 @@ test_data <- co2_present %>% filter(year >= 1998)
 train_data %>%
   model(TSLM(average ~ trend() + I(trend()^2) + I(trend()^3) + season())) -> lm_present_fit
 
-lm_present_forecast <- forecast(lm_present_fit, h=276)
-forecast::accuracy(lm_present_forecast, test_data)
+lm_present_forecast <- fabletools::forecast(lm_present_fit, h=276)
+fabletools::accuracy(lm_present_forecast, test_data)
 ```
 Above, we can see various accuracy metrics that the Linear Model forecast was evaluated on. In particular, the RMSE value is 17.26 - this value makes sense given the error histogram maxed out at around -30. The MAPE stands at around 349% which is not a great value for such an clean time series.
 
@@ -576,8 +582,8 @@ Now, we will take a look at some of the forecast accuracy metrics.
 train_data %>%
   model(ARIMA(average ~ 0 + pdq(0, 1, 1) + PDQ(1, 1, 2))) -> arima_present_fit
 
-arima_present_forecast <- forecast(arima_present_fit, h=276)
-forecast::accuracy(arima_present_forecast, test_data)
+arima_present_forecast <- fabletools::forecast(arima_present_fit, h=276)
+fabletools::accuracy(arima_present_forecast, test_data)
 ```
 The error metrics for the ARIMA model do appear to be much better than they were for the Linear Model. With the RMSE standing at 7.37 and the MAPE being 151%. There is still room for improvement in this model, but it is performing better than the linear model.
 
@@ -615,7 +621,7 @@ train_s <- head(co2_sa, nrow(co2_sa) -  test.size) %>%
 ### Training the ARIMA Model on the NSA Data
 
 ```{r}
-adf.test(train_ns$average, alternative = "stationary")
+tseries::adf.test(train_ns$average, alternative = "stationary")
 ```
 The ADF test statistic and p-value come out to be equal to -0.72 and 0.96 respectively. Since the p-value is greater than 0.05, we would fail to reject the null hypothesis that the time series is non-stationary. Thus, we will apply differencing in order to attempt to make the time series stationary.
 
@@ -639,7 +645,7 @@ ns_diff_data <- train_ns %>%
   mutate(second_diff = difference(average, differences = 1)) %>%
   filter(!is.na(second_diff))
   
-adf.test(ns_diff_data$second_diff, alternative = "stationary")
+tseries::adf.test(ns_diff_data$second_diff, alternative = "stationary")
 ```
 
 The ADF test statistic and p-value come out to be equal to -34.717 and 0.01, respectively. Since the p-value is less than 0.05, we would reject the null hypothesis that the time series is non-stationary. Because we know we should use first differencing, we will set these hyper parameters and then select a model with the lowest BIC.
@@ -663,7 +669,7 @@ The residual plots for the ARIMA model appear to have constant variance and a me
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}  
 # Forecast over the entire period
-fc_24_ns <- forecast(model.ns, h = 24)
+fc_24_ns <- fabletools::forecast(model.ns, h = 24)
 
 far_plot <- fc_24_ns %>%
   autoplot(train_ns) +
@@ -691,7 +697,7 @@ The forecast plots seem to track nicely with the actuals for the 24 month period
 We will perform an ADF test to determine whether the seasonally-adjusted data is stationary.
 
 ```{r}
-adf.test(train_s$season_adjust, alternative = "stationary")
+tseries::adf.test(train_s$season_adjust, alternative = "stationary")
 ```
 The ADF test statistic and p-value come out to be equal to -0.33 and 0.9895 respectively. Since the p-value is greater than 0.05, we would fail to reject the null hypothesis that the time series is non-stationary. Thus, we will apply differencing in order to attempt to make the time series stationary.
 
@@ -713,7 +719,7 @@ s_diff_data <- train_s %>%
   mutate(first_diff = difference(season_adjust, 2)) %>%
   filter(!is.na(first_diff))
   
-adf.test(s_diff_data$first_diff, alternative = "stationary")
+tseries::adf.test(s_diff_data$first_diff, alternative = "stationary")
 ```
 The ADF test statistic and p-value come out to be equal to -7.86 and 0.01 respectively. Since the p-value is less than 0.05, we could reject the null hypothesis that the time series is non-stationary.
 
@@ -740,7 +746,7 @@ augment(model.s) %>%
 
 ```{r, echo=FALSE, fig.align='center', fig.height=4, fig.width=10}  
 # Forecast over the entire period
-fc_24_s <- forecast(model.s, h = 24)
+fc_24_s <- fabletools::forecast(model.s, h = 24)
 
 far_plot_2 <- fc_24_s %>%
   autoplot(train_s) +
@@ -802,7 +808,7 @@ Now we will get predictions from the model.
 
 ```{r, prediction 420 ppm from 2021 on}
 # Prediction from 2021 to 2121
-fc2_100 <- forecast(model.bic3, h=1224) %>%
+fc2_100 <- fabletools::forecast(model.bic3, h=1224) %>%
   hilo() %>%
   unpack_hilo(c(`80%`, `95%`))
 
